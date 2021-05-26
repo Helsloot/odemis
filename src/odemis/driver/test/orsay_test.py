@@ -1112,7 +1112,7 @@ class TestTestDevice(unittest.TestCase):
         """
         cls.oserver.terminate()
 
-    def test_OrsayBooleanVA(self):
+    def test_OrsayBooleanConnector(self):
         """
         Test the boolean VA TurboPump1.IsOn
         """
@@ -1140,7 +1140,7 @@ class TestTestDevice(unittest.TestCase):
         print("VA: %s" % str(self.test_dev.testBooleanVA.value))
         self.assertEqual(self.datamodel.HybridPlatform.PumpingSystem.TurboPump1.IsOn.Actual, str(self.test_dev.testBooleanVA.value))
 
-    def test_OrsayFloatVA(self):
+    def test_OrsayFloatConnector(self):
         """
         Test the float VA Manometer1.Pressure
         """
@@ -1168,7 +1168,7 @@ class TestTestDevice(unittest.TestCase):
         print("VA: %s" % str(self.test_dev.testFloatVA.value))
         self.assertEqual(self.datamodel.HybridPlatform.PumpingSystem.Manometer1.Pressure.Actual, str(self.test_dev.testFloatVA.value))
 
-    def test_OrsayIntVA(self):
+    def test_OrsayIntConnector(self):
         """
         Test the int VA HVPSFloatingIon.HeaterState
         """
@@ -1196,7 +1196,7 @@ class TestTestDevice(unittest.TestCase):
         print("VA: %s" % str(self.test_dev.testIntVA.value))
         self.assertEqual(self.datamodel.HVPSFloatingIon.HeaterState.Actual, str(self.test_dev.testIntVA.value))
 
-    def test_OrsayTupleVA(self):
+    def test_OrsayTupleConnector(self):
         """
         Test the tuple VA IonColumnMCS.CondensorSteerer1StigmatorX and IonColumnMCS.CondensorSteerer1StigmatorY
         """
