@@ -42,9 +42,10 @@ VALVE_CLOSED = 2
 VALVE_ERROR = 3
 
 VACUUM_PRESSURE_RNG = (0, 110000)  # Pa
-NITROGEN_PRESSURE_RNG = (0, 5000000)  # Pa  Eventhough 0 is nowhere near a realistic value for the compressed
-# nitrogen, it is the initialisation value of this parameter in the Orsay server, meaning it needs to be included in
-# the VA's range
+NITROGEN_PRESSURE_RNG = (0, 5e6)  # Pa  Eventhough 0 is nowhere near a realistic value for the compressed
+# nitrogen or air, it is the initialisation value of this parameter in the Orsay server, meaning it needs to be included
+# in the VA's range
+COMP_AIR_PRESSURE_RNG = (0, 5e6)  # Pa
 
 ROD_NOT_DETECTED = 0
 ROD_RESERVOIR_NOT_STRUCK = 1
@@ -1513,9 +1514,8 @@ class OrsayParameterConnector:
         if not attributeName == self._attributeName:
             return
 
-        names = [(p.Name + ", ") for p in self._parameters]
         namesstring = ""
-        namesstring = namesstring.join(names)[:-2]
+        namesstring = namesstring.join([(p.Name + ", ") for p in self._parameters])[:-2]
         if parameter is not None and parameter not in self._parameters:
             raise ValueError("Incorrect parameter passed. Excpected: %s. Received: %s."
                              % (namesstring, parameter.Name))
@@ -1529,7 +1529,15 @@ class OrsayParameterConnector:
         else:
             new_value = self._parameter_to_VA_value(getattr(self._parameters[0], attributeName))
 
-        logging.debug("[%s].%s changed to %s." % (namesstring, attributeName, str(new_value)))
+        namesstring = "("
+        for p in self._parameters:
+            namesstring += p.Name + "." + attributeName + ", "
+        if self._va_is_tuple:
+            namesstring = namesstring[:-2] + ")"
+        else:
+            namesstring = namesstring[1:-2]
+
+        logging.debug("%s's VA changed to %s." % (namesstring, str(new_value)))
         self._va._value = new_value  # to not call the setter
         self._va.notify(new_value)
 
@@ -1544,11 +1552,15 @@ class OrsayParameterConnector:
         if self._va.readonly:
             raise NotSettableError("Value is read-only")
 
-        if self._va_is_tuple:
+        try:  # if self._va_is_tuple:
             for i in range(len(self._parameters)):
-                self._parameters[i].Target = self._VA_to_parameter_value(goal[i])
-        else:
-            self._parameters[0].Target = self._VA_to_parameter_value(goal)
+                target = self._VA_to_parameter_value(goal[i])
+                self._parameters[i].Target = target
+                logging.debug("Changing %s to %s." % (self._parameters[i].Name, str(target)))
+        except TypeError:  # else:  # in case goal is not subscriptable
+            target = self._VA_to_parameter_value(goal)
+            self._parameters[0].Target = target
+            logging.debug("Changing %s to %s." % (self._parameters[0].Name, str(target)))
 
         return goal
 
@@ -1562,7 +1574,7 @@ class OrsayParameterConnector:
             try:
                 return self._conversion[va_value]
             except KeyError:
-                logging.debug("Conversion dictionary does not contain key %s. Sticking to value %s" %
+                logging.warning("Conversion dictionary does not contain key %s. Sticking to value %s" %
                               (str(va_value), str(va_value)))
         return va_value
 
@@ -1688,11 +1700,19 @@ class FIBSource(model.HwComponent):
         self._ionColumn = None
         self._gunPump = None
         self._columnPump = None
-        self._devices_with_errorstates = None
         self._interlockHVPS = None
         self._interlockChamber = None
+        self._valve = None
+
+        self._devices_with_errorstates = ("HybridGaugeCompressedAir",
+                                          "HybridInterlockOutHVPS",
+                                          "HybridInterlockInChamberVac",
+                                          "HybridIonPumpGunFIB",
+                                          "HybridIonPumpColumnFIB",
+                                          "HybridValveFIB")
 
         self.interlockTriggered = model.BooleanVA(False, setter=self._resetInterlocks)
+        self.valveOpen = model.BooleanVA(False, setter=self._changeValveOpen)
         self.gunOn = model.BooleanVA(False)
         self.gunOnConnector = None
         self.gunPumpOn = model.BooleanVA(False)
@@ -1705,6 +1725,8 @@ class FIBSource(model.HwComponent):
         self.columnPressureConnector = None
         self.lifetime = model.FloatContinuous(0, readonly=True, unit="Ah", range=(0, 10))
         self.lifetimeConnector = None
+        self.compressedAirPressure = model.FloatContinuous(0, readonly=True, unit="Pa", range=COMP_AIR_PRESSURE_RNG)
+        self.compAirPressureConnector = None
         self.currentRegulation = model.BooleanVA(False)
         self.currentRegulationConnector = None
         self.sourceCurrent = model.FloatContinuous(0, readonly=True, unit="A", range=(0, 1e-5))
@@ -1721,11 +1743,11 @@ class FIBSource(model.HwComponent):
         self.energyLinkConnector = None
         self.extractorVoltage = model.FloatContinuous(0, unit="V", range=(0, 12e3))
         self.extractorVoltageConnector = None
-        self.mvaPosition = model.TupleContinuous((0.0, 0.0), unit="m", range=[(0, 0), (10, 10)])
-        self.mvaPositionConnector = None
-        self.mvaStepSize = model.FloatEnumerated(1e-6, unit="m",
-                                                 choices={2e-7, 5e-7, 1e-6, 5e-6, 1e-5, 2e-5, 1e-4, 5e-4, 2e-3, 25e-4})
-        self.mvaStepSizeConnector = None
+        # self.mvaPosition = model.TupleContinuous((0.0, 0.0), unit="m", range=[(0, 0), (10, 10)])
+        # self.mvaPositionConnector = None
+        # self.mvaStepSize = model.FloatEnumerated(1e-6, unit="m",
+        #                                          choices={2e-7, 5e-7, 1e-6, 5e-6, 1e-5, 2e-5, 1e-4, 5e-4, 2e-3, 25e-4})
+        # self.mvaStepSizeConnector = None
 
         self._connectorList = []
 
@@ -1743,15 +1765,12 @@ class FIBSource(model.HwComponent):
         self._columnPump = self.parent.datamodel.HybridIonPumpColumnFIB
         self._interlockHVPS = self.parent.datamodel.HybridInterlockOutHVPS
         self._interlockChamber = self.parent.datamodel.HybridInterlockInChamberVac
-        self._devices_with_errorstates = ("HybridGaugeCompressedAir",
-                                          "HybridInterlockOutHVPS",
-                                          "HybridInterlockInChamberVac",
-                                          "HybridIonPumpGunFIB",
-                                          "HybridIonPumpColumnFIB",
-                                          "HybridValveFIB")
+        self._valve = self.parent.datamodel.HybridValveFIB
 
         self._interlockHVPS.ErrorState.Subscribe(self._updateInterlockTriggered)
         self._interlockChamber.ErrorState.Subscribe(self._updateInterlockTriggered)
+        self._valve.IsOpen.Subscribe(self._updateErrorState)
+        self._valve.IsOpen.Subscribe(self._updateValveOpen)
         for device in self._devices_with_errorstates:
             p = getattr(self.parent.datamodel, device).ErrorState
             p.Subscribe(self._updateErrorState)
@@ -1763,6 +1782,8 @@ class FIBSource(model.HwComponent):
         self.gunPressureConnector = OrsayParameterConnector(self.gunPressure, self._gunPump.Pressure)
         self.columnPressureConnector = OrsayParameterConnector(self.columnPressure, self._columnPump.Pressure)
         self.lifetimeConnector = OrsayParameterConnector(self.lifetime, self._hvps.SourceLifeTime)
+        self.compAirPressureConnector = OrsayParameterConnector(self.compressedAirPressure,
+                                                                self.parent.datamodel.HybridGaugeCompressedAir.Pressure)
         self.currentRegulationConnector = OrsayParameterConnector(self.currentRegulation,
                                                                   self._hvps.BeamCurrent_Enabled)
         self.sourceCurrentConnector = OrsayParameterConnector(self.sourceCurrent, self._hvps.BeamCurrent)
@@ -1773,9 +1794,9 @@ class FIBSource(model.HwComponent):
         self.energyLinkConnector = OrsayParameterConnector(self.energyLink, self._hvps.EnergyLink,
                                                            conversion={True: "ON", False: "OFF"})
         self.extractorVoltageConnector = OrsayParameterConnector(self.extractorVoltage, self._hvps.Extractor)
-        self.mvaPositionConnector = OrsayParameterConnector(self.mvaPosition,
-                                                            [self._ionColumn.MCSProbe_X, self._ionColumn.MCSProbe_Y])
-        self.mvaStepSizeConnector = OrsayParameterConnector(self.mvaStepSize, self._ionColumn.MCSProbe_Step)
+        # self.mvaPositionConnector = OrsayParameterConnector(self.mvaPosition,
+        #                                                     [self._ionColumn.MCSProbe_X, self._ionColumn.MCSProbe_Y])
+        # self.mvaStepSizeConnector = OrsayParameterConnector(self.mvaStepSize, self._ionColumn.MCSProbe_Step)
 
         self._connectorList = [x for (x, _) in  # save only the names of the returned members
                                inspect.getmembers(self,  # get all members of this FIB_source object
@@ -1790,6 +1811,7 @@ class FIBSource(model.HwComponent):
         """
         self._updateErrorState()
         self._updateInterlockTriggered()
+        self._updateValveOpen()
         for obj_name in self._connectorList:
             getattr(self, obj_name).update_VA()
 
@@ -1802,9 +1824,9 @@ class FIBSource(model.HwComponent):
         """
         errorParameters = (getattr(self.parent.datamodel, device).ErrorState
                            for device in self._devices_with_errorstates)
-        if parameter is not None and parameter not in errorParameters:
-            raise ValueError("Incorrect parameter passed to _updateErrorState. Parameter should be None or a FIB "
-                             "related ErrorState parameter. Parameter passed is %s"
+        if parameter is not None and parameter not in errorParameters and not parameter == self._valve.IsOpen:
+            raise ValueError("Incorrect parameter passed to _updateErrorState. Parameter should be None, a FIB "
+                             "related ErrorState parameter or the HybridValveFIB.IsOpen. Parameter passed is %s"
                              % parameter.Name)
         if attributeName != "Actual":
             return
@@ -1816,6 +1838,16 @@ class FIBSource(model.HwComponent):
                 if not eState == "":
                     eState += ", "
                 eState += "%s error: %s" % (device, this_state)
+
+        valve_state = int(self._valve.IsOpen.Actual)
+        if valve_state == VALVE_ERROR:  # in case of valve error
+            if not eState == "":
+                eState += ", "
+            eState += "ValveFIB is in error"
+        elif valve_state == VALVE_UNDEF:  # in case no communication is present with the valve
+            if not eState == "":
+                eState += ", "
+            eState += "ValveFIB could not be contacted"
 
         if eState == "":
             self.state._set_value(model.ST_RUNNING, force_write=True)
@@ -1844,6 +1876,8 @@ class FIBSource(model.HwComponent):
                  INTERLOCK_DETECTED_STR in self._interlockChamber.ErrorState.Actual):
             new_value = True
 
+        logging.debug("%s set to %s." % ("interlockTriggered", str(new_value)))
+
         self.interlockTriggered._value = new_value  # to not call the setter
         self.interlockTriggered.notify(new_value)
 
@@ -1859,7 +1893,50 @@ class FIBSource(model.HwComponent):
         if value:
             self._interlockHVPS.Reset.Target = ""
             self._interlockChamber.Reset.Target = ""
+            logging.debug("Attempting to reset interlocks.")
         return False
+
+    def _updateValveOpen(self, parameter=None, attributeName="Actual"):
+        """
+        parameter (Orsay Parameter): the parameter on the Orsay server to use to update the VA
+        attributeName (str): the name of the attribute of parameter which was changed
+
+        Reads if the valve between the FIB column and analysis chamber is open from the Orsay server and saves it in
+        the valveOpen VA
+        """
+        if parameter is None:
+            parameter = self._valve.IsOpen
+        if parameter is not self._valve.IsOpen:
+            raise ValueError("Incorrect parameter passed to _updateValveOpen. Parameter should be "
+                             "datamodel.HybridValveFIB.IsOpen. Parameter passed is %s"
+                             % parameter.Name)
+        if attributeName != "Actual":
+            return
+        valve_state = int(parameter.Actual)
+        log_msg = "FIB valve state is: %s."
+        if valve_state in (VALVE_UNDEF, VALVE_ERROR):
+            logging.warning(log_msg % valve_state)
+            self._updateErrorState()
+        elif valve_state in (VALVE_OPEN, VALVE_CLOSED):
+            new_value = valve_state == VALVE_OPEN
+            if not new_value == self.valveOpen.value:
+                logging.debug(log_msg % valve_state)
+            self.valveOpen._value = new_value  # to not call the setter
+            self.valveOpen.notify(new_value)
+        else:  # if parameter.Actual is VALVE_TRANSIT, or undefined
+            logging.debug(log_msg % valve_state)
+
+    def _changeValveOpen(self, goal):
+        """
+        goal (bool): goal position of the valve: (True: "open", False: "closed")
+        return (bool): goal position of the gate as set to the server: (True: "open", False: "closed")
+
+        Opens the valve between the FIB column and analysis chamber on the Orsay server if argument goal is True.
+        Closes it otherwise.
+        """
+        logging.debug("Setting FIB valve to %s." % ("open" if goal else "closed"))
+        self._valve.IsOpen.Target = VALVE_OPEN if goal else VALVE_CLOSED
+        return self._valve.IsOpen.Target == VALVE_OPEN
 
     def terminate(self):
         """
@@ -1876,3 +1953,4 @@ class FIBSource(model.HwComponent):
             self._devices_with_errorstates = None
             self._interlockHVPS = None
             self._interlockChamber = None
+            self._valve = None
