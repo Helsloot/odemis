@@ -110,11 +110,13 @@ class OrsayComponent(model.HwComponent):
                                                            daemon=True)
         self._connection_monitor_thread.start()
 
+        no_child_str = "The Orsay component was not given a '%s' child"
+
         # create the pneumatic suspension child
         try:
             kwargs = children["pneumatic-suspension"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'pneumatic-suspension' child")
+            logging.info(no_child_str % "pneumatic-suspension")
         else:
             self._pneumaticSuspension = pneumaticSuspension(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._pneumaticSuspension)
@@ -123,7 +125,7 @@ class OrsayComponent(model.HwComponent):
         try:
             kwargs = children["pressure"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'pressure' child")
+            logging.info(no_child_str % "pressure")
         else:
             self._pressure = vacuumChamber(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._pressure)
@@ -132,7 +134,7 @@ class OrsayComponent(model.HwComponent):
         try:
             kwargs = children["pumping-system"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'pumping-system' child")
+            logging.info(no_child_str % "pumping-system")
         else:
             self._pumpingSystem = pumpingSystem(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._pumpingSystem)
@@ -141,7 +143,7 @@ class OrsayComponent(model.HwComponent):
         try:
             kwargs = children["ups"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'ups' child")
+            logging.info(no_child_str % "ups")
         else:
             self._ups = UPS(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._ups)
@@ -150,7 +152,7 @@ class OrsayComponent(model.HwComponent):
         try:
             kwargs = children["gis"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'gis' child")
+            logging.info(no_child_str % "gis")
         else:
             self._gis = GIS(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._gis)
@@ -159,7 +161,7 @@ class OrsayComponent(model.HwComponent):
         try:
             kwargs = children["gis-reservoir"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'gis-reservoir' child")
+            logging.info(no_child_str % "gis-reservoir")
         else:
             self._gis_reservoir = GISReservoir(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._gis_reservoir)
@@ -168,7 +170,7 @@ class OrsayComponent(model.HwComponent):
         try:
             kwargs = children["fib-device"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'fib-device' child")
+            logging.info(no_child_str % "fib-device")
         else:
             self._fib_device = FIBDevice(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._fib_device)
@@ -177,7 +179,7 @@ class OrsayComponent(model.HwComponent):
         try:
             kwargs = children["fib-source"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'fib-source' child")
+            logging.info(no_child_str % "fib-source")
         else:
             self._fib_source = FIBSource(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._fib_source)
@@ -186,7 +188,7 @@ class OrsayComponent(model.HwComponent):
         try:
             kwargs = children["fib-beam"]
         except (KeyError, TypeError):
-            logging.info("Orsay was not given a 'fib-beam' child")
+            logging.info(no_child_str % "fib-beam")
         else:
             self._fib_beam = FIBBeam(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._fib_beam)
@@ -633,7 +635,7 @@ class vacuumChamber(model.Actuator):
         logging.debug("Setting vacuum status to %s." % self.axes["vacuum"].choices[goal])
         self._vacuumStatusReached.clear()  # to make sure it will wait
         self._chamber.VacuumStatus.Target = goal
-        if not self._vacuumStatusReached.wait(18000):  # wait maximally 5 hours
+        if not self._vacuumStatusReached.wait(18000):  # wait maximally 5 hours  TODO: TUNE THIS?
             raise TimeoutError("Something went wrong awaiting a change in the vacuum status.")
         self._updatePosition()
 
