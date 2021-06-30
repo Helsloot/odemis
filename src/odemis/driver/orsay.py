@@ -2550,9 +2550,10 @@ class Scanner(model.Emitter):
         • blanker: VAEnumerated, choices={True: "blanking", False: "no blanking", None: "imaging"}
         """
 
-        model.Emitter.__init__(self, name, role, parent=parent, **kwargs)
+        super().__init__(name, role, parent=parent, **kwargs)
 
         self.fibbeam = self.parent._fib_beam  # reference to the FIBBeam object
+        # In case there is no such sibling, let it raise an exception
 
         self.blanker = model.VAEnumerated(True, choices={True: "blanking", False: "no blanking", None: "imaging"},
                                           setter=self._blanker_setter)
@@ -2602,3 +2603,93 @@ class Scanner(model.Emitter):
         Called when Odemis is closed
         """
         pass
+
+
+class Focus(model.Actuator):
+    """
+    Represents the Focused Ion Beam (FIB) from Orsay Physics.
+    This is an extension of the model.Actuator class. It controls the depth position of the focus point of the FIB.
+    """
+
+    def __init__(self, name, role, parent, coefficient, **kwargs):
+        """
+        coefficient is the value of a in V2 = V1 + a * d, where V2 is the new voltage of the objective lens, V1 is the
+        old voltage of the objective lens and d is the relative change in focus distance in micrometer.
+        coefficient should be in Volt per micrometer. It is stored in metadata MD_CALIB in units of Volt per meter.
+        Raises AttributeError exception if there is no _fib_beam sibling.
+        """
+        axes_def = {"z": model.Axis(unit="m", range=(-1e-3, 1e-3))}
+        super().__init__(name, role, parent=parent, axes=axes_def, **kwargs)
+
+        self.position = model.VigilantAttribute({"z": 0.0}, readonly=True, unit="m")
+        self.parent._fib_beam.objectiveVoltage.subscribe(self._updatePosition)
+
+        self._baseLensVoltage = 0.0  # V1, the objective lens voltage corresponding to a focus distance of 0
+        # Changes during runtime
+
+        self._metadata.update({model.MD_CALIB: coefficient * 10**6})
+
+        self._executor = CancellableThreadPoolExecutor(max_workers=1)
+
+    def _updatePosition(self, value=None):
+        """
+        value is the current value of the objective lens voltage. If value is None, this voltage will be read from the
+        FIBBeam sibling.
+        Calculates the current focus distance as d = (value - baseLensVoltage) / coefficient
+        """
+        if value is None:
+            value = self.parent._fib_beam.objectiveVoltage.value
+        new_d = (value - self._baseLensVoltage) / self._metadata(model.MD_CALIB)
+        self.position._set_value({"z": new_d}, force_write=True)
+
+    def _doMove(self, delta, timeout=60):
+        """
+        delta (float) is the desired relative change in focus distance in meter.
+        timeout (int or float) is the number of seconds to wait for said change.
+        Calculated the new voltage as V = baseLensVoltage + coefficient * (current_position + delta).
+        Blocking until the new position is reached or it times out.
+        """
+        new_position = self.position.value["z"] + delta
+        new_voltage = self._baseLensVoltage + self._metadata(model.MD_CALIB) * new_position
+        new_voltage = int(new_voltage)
+        self.parent._fib_beam.objectiveVoltage.value = new_voltage
+
+        start = time.time()
+        while not self.position.value["z"] == new_position:
+            if time.time() - start >= timeout:
+                raise TimeoutError("Timed out changing the objective lens voltage")
+
+    @isasync
+    def moveAbs(self, pos):
+        """
+        Move the focus point to pos["z"] meters
+        """
+        self._checkMoveAbs(pos)
+        delta = pos["z"] - self.position.value["z"]
+        logging.debug("Moving focus point to %f meter" % pos["z"])
+        return self._executor.submit(self._doMove, delta)
+
+    @isasync
+    def moveRel(self, shift):
+        """
+        Move the focus point by shift["z"] meters
+        """
+        self._checkMoveRel(shift)
+        logging.debug("Moving focus point by %f meter" % shift["z"])
+        return self._executor.submit(self._doMove, shift["z"])
+
+    def stop(self, axes=None):
+        """
+        Cancel all queued calls in the executor
+        """
+        logging.debug("Cancelling the executor")
+        self._executor.cancel()
+
+    def terminate(self):
+        """
+        Stop and shut down the executor
+        """
+        if self._executor:
+            self.stop()
+            self._executor.shutdown()
+            self._executor = None

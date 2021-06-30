@@ -75,3 +75,9 @@ Orsay: {
     role: scanner,
     init: {}
 }
+
+"Focus": {
+    role: focus,
+    init: {}
+    coefficient: 0.18  # Volt per micrometer, don't change this value unless you know EXACTLY what you are doing. Read the driver specifications for more details
+}
