@@ -46,6 +46,7 @@ CONFIG_FIBDEVICE = {"name": "fib-device", "role": "fib-device"}
 CONFIG_FIBSOURCE = {"name": "fib-source", "role": "fib-source"}
 CONFIG_FIBBEAM = {"name": "fib-beam", "role": "fib-beam"}
 CONFIG_SCANNER = {"name": "scanner", "role": "scanner"}
+CONFIG_FOCUS = {"name": "focus", "role": "focus", "coefficient": 0.18}  # coefficient is in [Volt / micrometer]
 
 CONFIG_ORSAY = {"name": "Orsay", "role": "orsay", "host": "192.168.56.101",
                 "children": {"pneumatic-suspension": CONFIG_PSUS,
@@ -57,7 +58,8 @@ CONFIG_ORSAY = {"name": "Orsay", "role": "orsay", "host": "192.168.56.101",
                              "fib-device": CONFIG_FIBDEVICE,
                              "fib-source": CONFIG_FIBSOURCE,
                              "fib-beam": CONFIG_FIBBEAM,
-                             "scanner": CONFIG_SCANNER}
+                             "scanner": CONFIG_SCANNER,
+                             "focus": CONFIG_FOCUS}
                 }
 
 
@@ -1713,7 +1715,6 @@ class TestFIBBeam(unittest.TestCase):
 class TestScanner(unittest.TestCase):
     """
     Tests for the Focused Ion Beam (FIB) Scanner
-    TODO: Tune the settletime of the hardware safe tests to values appropariate for the hardware
     """
 
     oserver = None
@@ -1773,6 +1774,125 @@ class TestScanner(unittest.TestCase):
         self.assertFalse(self.fibbeam.blanker.value)
         self.scanner.blanker.value = None
         self.assertIsNone(self.fibbeam.blanker.value)
+
+
+class TestFocus(unittest.TestCase):
+    """
+    Tests for the Focused Ion Beam (FIB) Focus
+    """
+
+    oserver = None
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Setup the Orsay client
+        """
+        if TEST_NOHW == 1:
+            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+
+        cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
+        cls.datamodel = cls.oserver.datamodel
+        cls.ov = cls.datamodel.HVPSFloatingIon.ObjectiveVoltage  # should only be needed in simulation
+        for child in cls.oserver.children.value:
+            if child.name == CONFIG_FIBBEAM["name"]:
+                cls.fibbeam = child
+            elif child.name == CONFIG_FOCUS["name"]:
+                cls.focus = child
+        # Set the objective voltage and base voltage to the same reasonable value
+        cls.focus._baseLensVoltage = 10000
+        if TEST_NOHW == "sim":  # Actual stays 0 in simulation, so set it directly
+            cls.ov.Actual = 10000
+        else:
+            cls.fibbeam.objectiveVoltage.value = 10000
+        sleep(0.5)
+
+    @classmethod
+    def tearDownClass(cls):
+        """
+        Terminate the Orsay client
+        """
+        cls.oserver.terminate()
+
+    def test_position_update(self):
+        """
+        Test that the position changes correctly when the objective lens voltage changes
+        """
+        deltaV = 1
+        deltap = 50/9 * 10**-6  # 1/0.18 == 50/9
+        if TEST_NOHW == "sim":
+            self.ov.Actual = int(self.ov.Actual) + deltaV
+        else:
+            self.fibbeam.objectiveVoltage.value += deltaV
+        sleep(0.5)
+        self.assertAlmostEqual(deltap, self.focus.position.value["z"])
+
+    def test_baseLensVoltage(self):
+        """
+        Test that setting the baseLensVoltage to a certain value and changing the objective lens voltage to the same
+        value, sets position to 0.0
+        """
+        testV = 15000
+        self.focus._baseLensVoltage = testV
+        if TEST_NOHW == "sim":
+            self.ov.Actual = testV
+        else:
+            self.fibbeam.objectiveVoltage.value = testV
+        sleep(0.5)
+        self.assertEqual(0.0, self.focus.position.value["z"])
+
+    def test_moveRel(self):
+        """
+        Test moveRel to see if it has the expected effect on the objective lens voltage, even with a delta that should
+        lead to less than 1V change
+        """
+        if not TEST_NOHW == 1:
+            self.skipTest("Writing to FIBBeam.objectiveVoltage does not work in simulation, because the simulator does"
+                          "not copy the Target value to Actual. No way to test moveRel.")
+
+        initp = self.focus.position.value["z"]
+
+        # Exact step
+        deltaV1 = 2
+        deltap1 = 100/9 * 10**-6
+        old_voltage = self.fibbeam.objectiveVoltage.value
+        self.focus.moveRel({"z": deltap1})
+        sleep(0.5)
+        self.assertEqual(deltaV1, self.fibbeam.objectiveVoltage.value - old_voltage)
+        self.assertEqual(initp + deltap1, self.focus.position.value["z"])
+
+        # Short step
+        deltaV2 = 0
+        deltap2 = -24/9 * 10**-6  # smaller than 1/0.18/2 micrometer
+        old_voltage = self.fibbeam.objectiveVoltage.value
+        self.focus.moveRel({"z": deltap2})
+        sleep(0.5)
+        self.assertEqual(deltaV2, self.fibbeam.objectiveVoltage.value - old_voltage)
+        self.assertEqual(initp + deltap1 + deltap2, self.focus.position.value["z"])
+
+        # Short steps should stack
+        deltaV3 = -1
+        deltap3 = -24/9 * 10**-6  # again smaller than 1/0.18/2 micrometer
+        old_voltage = self.fibbeam.objectiveVoltage.value
+        self.focus.moveRel({"z": deltap3})
+        sleep(0.5)
+        self.assertEqual(deltaV3, self.fibbeam.objectiveVoltage.value - old_voltage)
+        self.assertEqual(initp + deltap1 + deltap2 + deltap3, self.focus.position.value["z"])
+
+    def test_moveAbs(self):
+        """
+        Test moveAbs to see if it has the expected effect on the objective lens voltage
+        """
+        if not TEST_NOHW == 1:
+            self.skipTest("Writing to FIBBeam.objectiveVoltage does not work in simulation, because the simulator does"
+                          "not copy the Target value to Actual. No way to test moveAbs.")
+
+        position = -3 * 10**-6
+        expected_voltage = int(round(self.focus._baseLensVoltage + 0.18 * position))
+        self.focus.moveAbs({"z": position})
+        sleep(0.5)
+        self.assertEqual(position, self.focus.position.value["z"])
+        self.assertEqual(expected_voltage, self.fibbeam.objectiveVoltage.value)
 
 
 def connector_test(test_case, va, parameters, valuepairs, readonly=False, hw_safe=False, settletime=0.5):

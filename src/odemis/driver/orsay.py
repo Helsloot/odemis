@@ -200,6 +200,15 @@ class OrsayComponent(model.HwComponent):
             self._scanner = Scanner(parent=self, daemon=daemon, **kwargs)
             self.children.value.add(self._scanner)
 
+        # create the FIB Focus child
+        try:
+            kwargs = children["focus"]
+        except (KeyError, TypeError):
+            logging.info("Orsay was not given a 'focus' child")
+        else:
+            self._focus = Focus(parent=self, daemon=daemon, **kwargs)
+            self.children.value.add(self._focus)
+
     def on_connect(self):
         """
         Defines direct pointers to server components and connects parameter callbacks for the Orsay server.
@@ -2639,7 +2648,7 @@ class Focus(model.Actuator):
         """
         if value is None:
             value = self.parent._fib_beam.objectiveVoltage.value
-        new_d = (value - self._baseLensVoltage) / self._metadata(model.MD_CALIB)
+        new_d = (value - self._baseLensVoltage) / self._metadata[model.MD_CALIB]
         self.position._set_value({"z": new_d}, force_write=True)
 
     def _doMove(self, delta, timeout=60):
@@ -2650,8 +2659,8 @@ class Focus(model.Actuator):
         Blocking until the new position is reached or it times out.
         """
         new_position = self.position.value["z"] + delta
-        new_voltage = self._baseLensVoltage + self._metadata(model.MD_CALIB) * new_position
-        new_voltage = int(new_voltage)
+        new_voltage = self._baseLensVoltage + self._metadata[model.MD_CALIB] * new_position
+        new_voltage = int(round(new_voltage))
         self.parent._fib_beam.objectiveVoltage.value = new_voltage
 
         start = time.time()
