@@ -62,6 +62,10 @@ CONFIG_ORSAY = {"name": "Orsay", "role": "orsay", "host": "192.168.56.101",
                              "focus": CONFIG_FOCUS}
                 }
 
+NO_SERVER_STR = "TEST_NOHW is set. No server to contact."
+NOT_SIM_STR = "TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server outside of " \
+              "simulation, nor is Target copied to Actual directly."
+
 
 class TestOrsayStatic(unittest.TestCase):
     """
@@ -73,7 +77,7 @@ class TestOrsayStatic(unittest.TestCase):
         Test to create an Orsay component
         """
         if TEST_NOHW == 1:
-            self.skipTest("TEST_NOHW is set. No server to contact.")
+            self.skipTest(NO_SERVER_STR)
         try:
             oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
         except Exception as e:
@@ -103,7 +107,7 @@ class TestOrsay(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
 
         cls.datamodel = cls.oserver.datamodel
@@ -136,8 +140,7 @@ class TestOrsay(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.oserver._updateProcessInfo(self.datamodel.HybridPlatform.Cancel)
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_string = "Some process information"
         self.datamodel.HybridPlatform.ProcessInfo.Actual = test_string
         sleep(1)
@@ -187,7 +190,7 @@ class TestPneumaticSuspension(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
 
         cls.datamodel = cls.oserver.datamodel
@@ -231,8 +234,7 @@ class TestPneumaticSuspension(unittest.TestCase):
             self.psus._updateErrorState(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_string = "This thing broke"
 
         self.datamodel.HybridPlatform.Manometer2.ErrorState.Actual = test_string
@@ -284,8 +286,7 @@ class TestPneumaticSuspension(unittest.TestCase):
             self.psus._updatePressure(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_value = 1.0
         self.psus._gauge.Actual = test_value
         sleep(1)
@@ -306,7 +307,7 @@ class TestVacuumChamber(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
 
         cls.datamodel = cls.oserver.datamodel
@@ -412,8 +413,7 @@ class TestVacuumChamber(unittest.TestCase):
             self.pressure._updateErrorState(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_string = "This thing broke"
 
         self.pressure._gate.ErrorState.Actual = test_string
@@ -443,8 +443,7 @@ class TestVacuumChamber(unittest.TestCase):
             self.pressure._updatePressure(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_value = 1.0
         self.pressure._chamber.Pressure.Actual = test_value
         sleep(1)
@@ -459,8 +458,7 @@ class TestVacuumChamber(unittest.TestCase):
             self.pressure._updatePosition(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_value = 1
         self.pressure._chamber.VacuumStatus.Actual = test_value
         sleep(1)
@@ -481,7 +479,7 @@ class TestPumpingSystem(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
 
         cls.datamodel = cls.oserver.datamodel
@@ -505,8 +503,7 @@ class TestPumpingSystem(unittest.TestCase):
             self.psys._updateErrorState(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_string = "This thing broke"
 
         self.psys._system.Manometer1.ErrorState.Actual = test_string
@@ -534,7 +531,7 @@ class TestPumpingSystem(unittest.TestCase):
             self.psys._updateSpeed(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, data isn't copied from Target to Actual outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         test_value = 1.0
         self.psys._system.TurboPump1.Speed.Target = test_value
@@ -550,7 +547,7 @@ class TestPumpingSystem(unittest.TestCase):
             self.psys._updateTemperature(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, data isn't copied from Target to Actual outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         test_value = 1.0
         self.psys._system.TurboPump1.Temperature.Target = test_value
@@ -566,7 +563,7 @@ class TestPumpingSystem(unittest.TestCase):
             self.psys._updatePower(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, data isn't copied from Target to Actual outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         test_value = 1.0
         self.psys._system.TurboPump1.Power.Target = test_value
@@ -583,7 +580,7 @@ class TestPumpingSystem(unittest.TestCase):
             self.psys._updateSpeedReached(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, data isn't copied from Target to Actual outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         test_value = True
         self.psys._system.TurboPump1.SpeedReached.Target = test_value
@@ -632,7 +629,7 @@ class TestPumpingSystem(unittest.TestCase):
             self.psys._updateNitrogenPressure(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, data isn't copied from Target to Actual outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_value = 1.0
         self.psys._system.Manometer1.Pressure.Target = test_value
         sleep(1)
@@ -653,7 +650,7 @@ class TestUPS(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
 
         cls.datamodel = cls.oserver.datamodel
@@ -690,7 +687,7 @@ class TestGIS(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
 
         cls.datamodel = cls.oserver.datamodel
@@ -714,8 +711,7 @@ class TestGIS(unittest.TestCase):
             self.gis._updateErrorState(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_string = "This thing broke"
 
         self.gis._gis.ErrorState.Actual = test_string
@@ -734,7 +730,7 @@ class TestGIS(unittest.TestCase):
             self.gis._updatePosition(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, data isn't copied from Target to Actual outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         self.gis._gis.PositionState.Target = orsay.STR_WORK
         sleep(1)
@@ -757,7 +753,7 @@ class TestGIS(unittest.TestCase):
             self.gis._updateInjectingGas(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, data isn't copied from Target to Actual outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         self.gis._gis.ReservoirState.Target = orsay.STR_OPEN
         sleep(1)
@@ -840,7 +836,7 @@ class TestGISReservoir(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
 
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
 
@@ -867,8 +863,7 @@ class TestGISReservoir(unittest.TestCase):
             self.gis_res._updateErrorState(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
         test_string = "This thing broke"
 
         self.gis_res._gis.ErrorState.Actual = test_string
@@ -921,8 +916,7 @@ class TestGISReservoir(unittest.TestCase):
             self.gis_res._updateTemperature(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         test_value = 20
         self.gis_res._temperaturePar.Target = test_value
@@ -969,8 +963,7 @@ class TestGISReservoir(unittest.TestCase):
             self.gis_res._updateAge(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         test_value = 20
         self.gis_res._gis.ReservoirLifeTime.Actual = test_value
@@ -990,8 +983,7 @@ class TestGISReservoir(unittest.TestCase):
             self.gis_res._updatePrecursorType(self.datamodel.HybridPlatform.Cancel)
 
         if not TEST_NOHW == "sim":
-            self.skipTest("TEST_NOHW is not set to sim, cannot force data on Actual parameters of Orsay server "
-                          "outside of simulation.")
+            self.skipTest(NOT_SIM_STR)
 
         test_value = "test precursor"
         self.gis_res._gis.PrecursorType.Actual = test_value
@@ -1101,7 +1093,7 @@ class TestOrsayParameterConnector(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
 
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
         cls.datamodel = cls.oserver.datamodel
@@ -1194,7 +1186,7 @@ class TestFIBDevice(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
 
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
         cls.datamodel = cls.oserver.datamodel
@@ -1333,7 +1325,7 @@ class TestFIBSource(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
 
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
         cls.datamodel = cls.oserver.datamodel
@@ -1441,7 +1433,7 @@ class TestFIBBeam(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
 
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
         cls.datamodel = cls.oserver.datamodel
@@ -1725,7 +1717,7 @@ class TestScanner(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
 
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
         cls.datamodel = cls.oserver.datamodel
@@ -1789,7 +1781,7 @@ class TestFocus(unittest.TestCase):
         Setup the Orsay client
         """
         if TEST_NOHW == 1:
-            raise unittest.SkipTest("TEST_NOHW is set. No server to contact.")
+            raise unittest.SkipTest(NO_SERVER_STR)
 
         cls.oserver = orsay.OrsayComponent(**CONFIG_ORSAY)
         cls.datamodel = cls.oserver.datamodel
@@ -1915,7 +1907,7 @@ def connector_test(test_case, va, parameters, valuepairs, readonly=False, hw_saf
     :returns: Nothing
     """
     if TEST_NOHW == 1:
-        test_case.skipTest("TEST_NOHW is set. No server to contact.")
+        test_case.skipTest(NO_SERVER_STR)
 
     if not TEST_NOHW == "sim" and not hw_safe:
         test_case.skipTest("This test is not hardware safe.")

@@ -1504,40 +1504,39 @@ class OrsayParameterConnector:
 
         Subscribes the VA to the parameter
         """
-        if self._parameters is not None and None not in {self._attributeName, self._va, self._va_type_name}:
+        if self._parameters is not None:
             logging.warning("OrsayParameterConnector is already connected to an Orsay parameter. It is better to call "
                             "disconnect before reconnecting to something else.")
 
         if type(parameter) in {set, list, tuple}:
             self._parameters = list(parameter)
-            if self._minpar is not None and self._maxpar is not None:
+            if None not in (self._minpar, self._maxpar):
                 self._minpar = list(self._minpar)
                 self._maxpar = list(self._maxpar)
         else:
             self._parameters = [parameter]
-            if self._minpar is not None and self._maxpar is not None:
+            if None not in (self._minpar, self._maxpar):
                 self._minpar = [self._minpar]
                 self._maxpar = [self._maxpar]
-        if len(self._parameters) == 0:
-            raise ValueError("No parameters passed")
-        if self._minpar is not None and self._maxpar is not None:
-            if not len(self._parameters) == len(self._minpar) or not len(self._parameters) == len(self._maxpar):
-                raise ValueError("Number of parameters, minimum parameters and maximum parameters is not equal")
+
+        if None not in (self._minpar, self._maxpar) and (not len(self._parameters) == len(self._minpar) or
+                                                         not len(self._parameters) == len(self._maxpar)):
+            raise ValueError("Number of parameters, minimum parameters and maximum parameters is not equal")
         self._attributeName = attributeName
         self._va = va
         self._va_type_name = va.__class__.__name__
         if self._va_type_name.startswith("Tuple"):
+            if not len(self._parameters) == len(self._va.value):
+                raise ValueError("Length of Tuple VA does not match number of parameters passed.")
             self._va_is_tuple = True
             self._va_value_type = type(self._va.value[0])
         else:
+            if len(self._parameters) > 1:
+                raise ValueError("Multiple parameters are passed, but VA is not of a tuple type.")
             self._va_is_tuple = False
             self._va_value_type = type(self._va.value)
         if not self._va.readonly:
             self._va._setter = WeakMethod(self._update_parameter)
-        if self._va_is_tuple and not len(self._parameters) == len(self._va.value):
-            raise ValueError("Length of Tuple VA does not match number of parameters passed.")
-        if len(self._parameters) > 1 and not self._va_is_tuple:
-            raise ValueError("Multiple parameters are passed, but VA is not of a tuple type.")
 
         if hasattr(self._va, "range"):
             if self._va_is_tuple:
@@ -1548,36 +1547,31 @@ class OrsayParameterConnector:
             for i in range(len(self._parameters)):
                 p = self._parameters[i]
 
+                upperbound = None
                 lowerbound = None
-                if self._minpar is not None:  # in case a minimum parameter is supplied
-                    if self._minpar[i].Actual is not None:
-                        lowerbound = self._minpar[i].Actual
-                    else:
+                if None not in (self._minpar, self._maxpar):  # in case a minimum and maximum parameter are supplied
+                    lowerbound = self._minpar[i].Actual
+                    if lowerbound is None:
                         lowerbound = self._minpar[i].Target
+                    upperbound = self._maxpar[i].Actual
+                    if upperbound is None:
+                        upperbound = self._maxpar[i].Target
                 if lowerbound is None:
                     lowerbound = p.Min
                 else:
-                    if p.Min is not None and not p.Min == lowerbound:
+                    if not p.Min == lowerbound:
                         raise AssertionError("%s.Min and %s contain different, non-None values."
                                              "Contact Orsay Physics about this!" % (p.Name, self._minpar[i].Name))
-
-                if lowerbound is not None:  # if a lowerbound is defined in the server
-                    new_range[0][i] = self._parameter_to_VA_value(lowerbound)  # copy it to the va
-
-                upperbound = None
-                if self._maxpar is not None:  # in case a minimum parameter is supplied
-                    if self._maxpar[i].Actual is not None:
-                        upperbound = self._maxpar[i].Actual
-                    else:
-                        upperbound = self._maxpar[i].Target
                 if upperbound is None:
                     upperbound = p.Max
                 else:
-                    if p.Max is not None and not p.Max == upperbound:
+                    if not p.Max == upperbound:
                         raise AssertionError("%s.Max and %s contain different, non-None values."
                                              "Contact Orsay Physics about this!" % (p.Name, self._maxpar[i].Name))
-                if upperbound is not None:  # if an upperbound is defined in the server
-                    new_range[1][i] = self._parameter_to_VA_value(upperbound)  # copy it to the va
+
+                if None not in (lowerbound, upperbound):  # if a lowerbound and upperbound are defined in the server
+                    new_range[0][i] = self._parameter_to_VA_value(lowerbound)  # convert them to the va equivalent
+                    new_range[1][i] = self._parameter_to_VA_value(upperbound)
 
             if len(new_range[0]) == 1:
                 new_range = (new_range[0][0], new_range[1][0])
@@ -1708,7 +1702,7 @@ class OrsayParameterConnector:
         elif self._va_value_type == int:
             return int(par_value)
         elif self._va_value_type == bool:
-            return par_value in {True, "True", "true", 1, "1", "ON"}
+            return par_value in {True, "True", "true", "1", "ON"}
         else:
             raise NotImplementedError("Handeling of VA's of type %s is not implemented for OrsayParameterConnector."
                                       % self._va_type_name)
@@ -2636,7 +2630,7 @@ class Focus(model.Actuator):
         self._baseLensVoltage = 0.0  # V1, the objective lens voltage corresponding to a focus distance of 0
         # Changes during runtime
 
-        self._metadata.update({model.MD_CALIB: coefficient * 10**6})
+        self._metadata.update({model.MD_CALIB: coefficient * 10 ** 6})
 
         self._executor = CancellableThreadPoolExecutor(max_workers=1)
 
